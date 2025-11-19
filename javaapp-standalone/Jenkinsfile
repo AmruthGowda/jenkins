@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+
+    environment {
+        DEPLOY_SERVER = '/opt/apps/'
+    }
+
+    stages {
+        stage('Checkout') {
+	when {
+		branch 'master'
+	}
+        steps {
+        	checkout scm        
+            }
+        }
+
+        stage('Build') {
+            when {
+                branch 'master'
+            }
+            steps {
+                echo "Building on main branch..."
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Test & Scan') {
+	when {
+		branch 'dev'
+	}
+        steps {
+		 withSonarQubeEnv('sonar'){ 
+
+                    sh ''' 
+
+                        cd javaapp-standalone 
+
+                        mvn clean verify sonar:sonar -Dsonar.projectKey=java-app -Dsonar.projectName='java-app' 
+
+                    ''' 
+                }
+            }
+        }
+
+        stage('Manual Approval & Deploy') {
+            when {
+                branch 'dev'
+            }
+            steps {
+                script {
+                    def userInput = input(
+                        id: 'DeployApproval', message: 'Approve Deployment to Production?', parameters: [
+                        [$class: 'BooleanParameterDefinition', defaultValue: true, description: 'Proceed with deploy?', name: 'Deploy']
+                        ])
+                    
+                    if (userInput != true) {
+                        error "Deployment aborted by user."
+                    }
+                }
+
+                echo "Deploying artifact to server..."
+                sh "scp target/*.jar ${DEPLOY_SERVER}"
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline finished for branch: ${env.BRANCH_NAME}"
+        }
+    }
+}
+
