@@ -1,14 +1,21 @@
 pipeline {
-    agent {label 'agent'}
+    //agent {label 'agent'}
+    agent any
 
     stages {
         stage('Checkout') {
+            when {
+                branch 'master'
+            }
             steps {
                 git url: 'https://github.com/artisantek/jenkins.git'
             }
         }
 
         stage('Tests') {
+            when {
+                branch 'dev'
+            }
             parallel {
                 stage('Unit Tests') {
                     steps {
@@ -17,16 +24,16 @@ pipeline {
                         }
                     }
                 }
-                stage('Trivy Scan') {
-                    steps {
-                        dir('javaapp-pipeline') {
-                            sh '''
-                                wget -q https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -O html.tpl
-                                trivy fs --format template --template "@html.tpl" -o report.html .
-                            '''
-                        }
-                    }
-                }
+               // stage('Trivy Scan') {
+                 //   steps {
+                   //     dir('javaapp-pipeline') {
+                     //       sh '''
+                       //         wget -q https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -O html.tpl
+                         //       trivy fs --format template --template "@html.tpl" -o report.html .
+                           // '''
+                        //}
+                    //}
+                //}
             }
         }
 
@@ -45,6 +52,9 @@ pipeline {
         // }
 
         stage('Build') {
+            when {
+                branch 'master'
+            }
             steps {
                 dir('javaapp-pipeline') {
                     sh 'mvn clean package'
@@ -52,34 +62,37 @@ pipeline {
             }
         }
 
-        stage('Publish') {
-            steps {
-                script {
-                    def GROUP_ID = sh(script: "mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout -f javaapp-pipeline/pom.xml", returnStdout: true).trim()
-                    def ARTIFACT_ID = sh(script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout -f javaapp-pipeline/pom.xml", returnStdout: true).trim()
-                    def VERSION = sh(script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f javaapp-pipeline/pom.xml", returnStdout: true).trim()
-                    def GROUP_PATH = sh(script: "echo '${GROUP_ID}' | tr '.' '/'", returnStdout: true).trim()
-                    def TARGET_PATH = "maven/${GROUP_PATH}/${ARTIFACT_ID}/${VERSION}/"
-                    def JAR_PATH = "${ARTIFACT_ID}-${VERSION}.jar"
+      //  stage('Publish') {
+        //    steps {
+          //      script {
+            //        def GROUP_ID = sh(script: "mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout -f javaapp-pipeline/pom.xml", returnStdout: true).trim()
+              //      def ARTIFACT_ID = sh(script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout -f javaapp-pipeline/pom.xml", returnStdout: true).trim()
+                //    def VERSION = sh(script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f javaapp-pipeline/pom.xml", returnStdout: true).trim()
+                  //  def GROUP_PATH = sh(script: "echo '${GROUP_ID}' | tr '.' '/'", returnStdout: true).trim()
+                  //  def TARGET_PATH = "maven/${GROUP_PATH}/${ARTIFACT_ID}/${VERSION}/"
+                  //  def JAR_PATH = "${ARTIFACT_ID}-${VERSION}.jar"
         
-                    dir('javaapp-pipeline/target') {
-                        rtUpload(
-                            serverId: 'jfrog',
-                            spec: """{
-                                "files": [
-                                    {
-                                        "pattern": "${JAR_PATH}",
-                                        "target": "${TARGET_PATH}"
-                                    }
-                                ]
-                            }"""
-                        )
-                    }
-                }
-            }
-        }
+                    //dir('javaapp-pipeline/target') {
+                      //  rtUpload(
+                        //    serverId: 'jfrog',
+                          //  spec: """{
+                            //    "files": [
+                              //      {
+                                //        "pattern": "${JAR_PATH}",
+                                  //      "target": "${TARGET_PATH}"
+                                   // }
+                                //]
+                            //}"""
+                       // )
+                   // }
+                //}
+            //}
+        //}
 
         stage('Deploy') {
+            when {
+                branch 'dev'
+            }
             steps {
                 dir('javaapp-pipeline/target') {
                     sh '''
@@ -97,14 +110,14 @@ pipeline {
 
     }
     
-    post {
-      always {
-        cleanWs()
-      }
-      failure {
-        emailext attachLog: true, body: 'Pipeline Failed, Please check the logs', subject: 'Job Failed', to: 'artisantek.adithya@gmail.com'
-      }
-    }
+    //post {
+      //always {
+        //cleanWs()
+      //}
+      //failure {
+       // emailext attachLog: true, body: 'Pipeline Failed, Please check the logs', subject: 'Job Failed', to: 'artisantek.adithya@gmail.com'
+      //}
+    //}
 
 
 }
