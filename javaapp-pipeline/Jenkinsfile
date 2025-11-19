@@ -1,4 +1,4 @@
-pipeline {
+/*pipeline {
     //agent {label 'agent'}
     agent any
 
@@ -120,4 +120,70 @@ pipeline {
     //}
 
 
+}
+*/
+
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git url: 'https://github.com/artisantek/jenkins.git'
+            }
+        }
+
+        /* ===============================
+           DEV BRANCH → ONLY TEST
+        =================================*/
+        stage('Dev - Tests') {
+            when { branch 'dev' }
+            steps {
+                dir('javaapp-pipeline') {
+                    sh 'mvn clean test'
+                }
+            }
+        }
+
+        /* ===============================
+           MAIN BRANCH → FULL BUILD
+        =================================*/
+        stage('Main - Build') {
+            when { branch 'main' }
+            steps {
+                dir('javaapp-pipeline') {
+                    sh 'mvn clean package'
+                }
+            }
+        }
+
+        /* ===============================
+           DEV BRANCH → DEPLOY
+        =================================*/
+        stage('Dev - Deploy') {
+            when { branch 'dev' }
+            steps {
+                dir('javaapp-pipeline/target') {
+                    sh '''
+                        if pgrep -f "java -jar java-sample-21-1.0.0.jar" > /dev/null; then
+                            pkill -f "java -jar java-sample-21-1.0.0.jar"
+                            echo "App was running and has been killed."
+                        else
+                            echo "App is not running."
+                        fi
+
+                        JENKINS_NODE_COOKIE=dontKillMe \
+                        nohup java -jar java-sample-21-1.0.0.jar > app.log 2>&1 &
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline completed for branch: ${env.BRANCH_NAME}"
+        }
+    }
 }
